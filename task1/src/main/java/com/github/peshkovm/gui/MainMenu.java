@@ -15,38 +15,24 @@ public class MainMenu {
     private JTextField folderLocationTextField;
     private JTextField findingTextTextField;
     private JButton folderLocationButton;
-    private JButton findingTextButton;
     private JLabel folderLocationLabel;
     private JLabel findingTextLabel;
     private JSeparator menuPanelSeparator;
     private JTextPane fileContentTextPane;
     private JSeparator fileTreeFileContentTextPaneSeparator;
+    private JTextField fileExtensionTextField;
+    private JButton searchButton;
 
-    public MainMenu() {
-        folderLocationButton.addActionListener(e -> {
-            JFileChooser fileLocationChooser = new JFileChooser();
-
-            fileLocationChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-            int ret = fileLocationChooser.showDialog(null, "Choose folder");
-
-            if (ret == JFileChooser.APPROVE_OPTION) {
-                File selectedFolder = fileLocationChooser.getSelectedFile();
-
-                List<File> foundFiles = WorkingWithFilesUtils.findFilesContainingText(selectedFolder, "public");
-
-                System.out.println(selectedFolder.getName());
-
-                foundFiles.forEach(System.out::println);
-            }
-        });
-
-        findingTextButton.addActionListener(e -> {
-            JFileChooser findingTextLocation = new JFileChooser();
-            findingTextLocation.showDialog(null, "Choose text");
-        });
-    }
+    //my fields
+    private File selectedFolder;
 
     public static void main(String[] args) {
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         JFrame frame = new JFrame("MainMenu");
         frame.setContentPane(new MainMenu().formPanel);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -55,7 +41,48 @@ public class MainMenu {
         frame.setVisible(true);
     }
 
+    public MainMenu() {
+        createUIComponents();
+    }
+
     private void createUIComponents() {
         // TODO: place custom component creation code here
+
+        folderLocationButton.addActionListener(e -> {
+            JFileChooser fileLocationChooser = new JFileChooser();
+
+            fileLocationChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+
+            int option = fileLocationChooser.showDialog(null, "Choose folder");
+
+            if (option == JFileChooser.APPROVE_OPTION) {
+                selectedFolder = fileLocationChooser.getSelectedFile();
+                folderLocationTextField.setText(selectedFolder.toString());
+            }
+        });
+
+        searchButton.addActionListener(e -> {
+            if (selectedFolder != null) {
+                String textToFind = findingTextTextField.getText();
+
+                if (textToFind == null)
+                    System.out.println("textToFind = null");
+                if (("").equals(textToFind))
+                    System.out.println("textToFind = \"\"");
+                else
+                    System.out.println("textToFind = " + textToFind);
+
+                String fileExtension = fileExtensionTextField.getText().substring(1);
+
+                System.out.println("fileExtension = " + fileExtension);
+
+                List<File> foundFiles = WorkingWithFilesUtils.findFilesContainingText(selectedFolder, textToFind, fileExtension);
+
+                System.out.println("\n\n" + selectedFolder.getName());
+
+                System.out.println("\n\nFounded files: ");
+                foundFiles.forEach(System.out::println);
+            }
+        });
     }
 }

@@ -1,5 +1,6 @@
 package com.github.peshkovm.core;
 
+import com.eaio.stringsearch.BoyerMooreHorspool;
 import org.apache.commons.io.FilenameUtils;
 
 import java.io.File;
@@ -18,26 +19,31 @@ public class WorkingWithFilesUtils {
 
     }
 
-    public static List<File> findFilesContainingText(final File directory, final String text) throws RuntimeException {
+    public static List<File> findFilesContainingText(final File directory, final String textToFind, final String fileExtension) throws RuntimeException {
         final Path directoryPath = directory.toPath();
 
         final List<File> foundFiles = new ArrayList<>();
+        final BoyerMooreHorspool boyerMooreHorspool = new BoyerMooreHorspool();
+
 
         try {
             Files.walkFileTree(directoryPath, new SimpleFileVisitor<>() {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
 
-                    System.out.println("\n visited file = " + file.getFileName() + "\n");
+                    //System.out.println("\n visited file = " + file.getFileName() + "\n");
 
                     final String extension = FilenameUtils.getExtension(file.toString());
 
-                    if (file.toFile().isFile() && extension.equals(".java")) {
-                        final List<String> fileContent = Files.readAllLines(file);
+                    if (file.toFile().isFile() && extension.equals(fileExtension)) {
 
-                        if (fileContent.contains(text)) {
+                        //System.out.println("\n visited file = " + file.getFileName() + "\n");
+
+                        byte[] fileContent = Files.readAllBytes(file);
+
+                        if (boyerMooreHorspool.searchBytes(fileContent, textToFind.getBytes()) != -1) {
                             foundFiles.add(file.toFile());
-                            return FileVisitResult.TERMINATE;
+                            //return FileVisitResult.TERMINATE;
                         }
                     }
 
