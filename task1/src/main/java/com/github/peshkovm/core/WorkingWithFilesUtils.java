@@ -1,6 +1,7 @@
 package com.github.peshkovm.core;
 
 import com.eaio.stringsearch.BoyerMooreHorspool;
+import com.eaio.stringsearch.ShiftOrMismatches;
 import org.apache.commons.io.FilenameUtils;
 
 import java.io.File;
@@ -19,10 +20,10 @@ public class WorkingWithFilesUtils {
 
     }
 
-    public static List<File> findFilesContainingText(final File directory, final String textToFind, final String fileExtension) throws RuntimeException {
+    public static List<Path> findFilesContainingText(final File directory, final String textToFind, final String fileExtension) throws RuntimeException {
         final Path directoryPath = directory.toPath();
 
-        final List<File> foundFiles = new ArrayList<>();
+        final List<Path> foundFiles = new ArrayList<>();
         final BoyerMooreHorspool boyerMooreHorspool = new BoyerMooreHorspool();
 
 
@@ -31,20 +32,25 @@ public class WorkingWithFilesUtils {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
 
-                    //System.out.println("\n visited file = " + file.getFileName() + "\n");
-
-                    final String extension = FilenameUtils.getExtension(file.toString());
-
-                    if (file.toFile().isFile() && extension.equals(fileExtension)) {
-
+                    try {
                         //System.out.println("\n visited file = " + file.getFileName() + "\n");
 
-                        byte[] fileContent = Files.readAllBytes(file);
+                        final String extension = FilenameUtils.getExtension(file.toString());
 
-                        if (boyerMooreHorspool.searchBytes(fileContent, textToFind.getBytes()) != -1) {
-                            foundFiles.add(file.toFile());
-                            //return FileVisitResult.TERMINATE;
+                        if (file.toFile().isFile() && extension.equals(fileExtension)) {
+
+                            //System.out.println("\n visited file = " + file.getFileName() + "\n");
+
+                            byte[] fileContent = Files.readAllBytes(file);
+
+                            if (boyerMooreHorspool.searchBytes(fileContent, textToFind.getBytes()) != -1) {
+                                foundFiles.add(file);
+                                //return FileVisitResult.TERMINATE;
+                            }
                         }
+
+                    } catch (Exception e) {
+
                     }
 
                     return FileVisitResult.CONTINUE;
@@ -52,7 +58,7 @@ public class WorkingWithFilesUtils {
             });
         } catch (IOException e) {
             e.printStackTrace();
-            throw new RuntimeException(e);
+            //throw new RuntimeException(e);
         }
 
         return foundFiles;
