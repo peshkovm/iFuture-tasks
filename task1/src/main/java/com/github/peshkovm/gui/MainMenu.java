@@ -1,16 +1,28 @@
 package com.github.peshkovm.gui;
 
 import com.github.peshkovm.core.FileTreeFiller;
+import com.github.peshkovm.core.LogViewTableModel;
 import com.github.peshkovm.core.WorkingWithFilesUtils;
 
 import javax.swing.*;
 import javax.swing.event.TreeExpansionEvent;
 import javax.swing.event.TreeExpansionListener;
+import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
+import javax.swing.table.AbstractTableModel;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableColumnModel;
 import javax.swing.tree.*;
+import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.regex.Matcher;
 
 public class MainMenu {
     private JPanel menuPanel;
@@ -24,15 +36,17 @@ public class MainMenu {
     private JLabel folderLocationLabel;
     private JLabel findingTextLabel;
     private JSeparator menuPanelSeparator;
-    private JTextPane fileContentTextPane;
     private JSeparator fileTreeFileContentTextPaneSeparator;
     private JTextField fileExtensionTextField;
     private JButton searchButton;
     private JScrollPane fileTreeScrollPane;
+    private JTable fileContentTable;
+    private JScrollPane fileContentTableScrollPane;
 
 
     Map<Path, DefaultMutableTreeNode> fileTreeContentMap;
     HashMap<TreePath, TreePath> fileTreeExpandedPaths;
+    LogViewTableModel fileContentTableModel = new LogViewTableModel();
 
     public static void main(String[] args) {
         try {
@@ -44,7 +58,7 @@ public class MainMenu {
         JFrame frame = new JFrame("MainMenu");
         frame.setContentPane(new MainMenu().formPanel);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(800, 800);
+        frame.setSize(1000, 900);
         //frame.pack();
         frame.setVisible(true);
     }
@@ -58,6 +72,8 @@ public class MainMenu {
         JFileChooser fileLocationChooser = new JFileChooser();
 
         initializeFileTree();
+
+        initializeFileContentTable();
 
         folderLocationButton.addActionListener(e -> {
 
@@ -95,17 +111,6 @@ public class MainMenu {
                 Thread thread = new Thread(() -> WorkingWithFilesUtils.findFilesContainingTextAndLazyFillTree(selectedFolder, textToFind, fileExtension, callback));
                 thread.start();
 
-/*                try {
-                    thread.join();
-                    DefaultTreeModel model = (DefaultTreeModel) fileTree.getModel();
-                    model.reload();
-                } catch (InterruptedException ex) {
-                    ex.printStackTrace();
-                }*/
-
-                //foundFiles.forEach(this::addNode);
-
-
                 System.out.println("After fill file tree");
             }
         });
@@ -133,86 +138,66 @@ public class MainMenu {
 
         DefaultTreeModel model = (DefaultTreeModel) fileTree.getModel();
         model.setRoot(root);
+        fileTree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
         //fileTree.setRootVisible(false);
     }
 
-    private void fillFileTree(final List<Path> foundFiles) {
-        if (foundFiles.size() > 0) {
-            final Map<Path, DefaultMutableTreeNode> fileTreeContentMap = new HashMap<>();
+    private void initializeFileContentTable() {
+        fileContentTable.setModel(fileContentTableModel);
 
-            //add root of file tree
-            DefaultTreeModel model = (DefaultTreeModel) fileTree.getModel();
-            final DefaultMutableTreeNode fileTreeRootNode = (DefaultMutableTreeNode) model.getRoot();
-            fileTreeRootNode.removeAllChildren();
+        MouseListener ml = new MouseAdapter() {
+            public void mousePressed(MouseEvent e) {
+                //int selRow = fileTree.getRowForLocation(e.getX(), e.getY());
 
-            foundFiles.forEach(foundFile -> {
-                //root
-                Path rootNodePath = foundFile.getRoot();
-                DefaultMutableTreeNode rootNode = new DefaultMutableTreeNode(rootNodePath);
-                if (fileTreeContentMap.putIfAbsent(rootNodePath, rootNode) == null)
-                    fileTreeRootNode.add(rootNode);
+                TreePath selPath = fileTree.getPathForLocation(e.getX(), e.getY());
+                //if(selRow != -1) {
+                if (e.getClickCount() == 1) {
+                    fileTree.getSelectionModel().clearSelection();
+                } else if (e.getClickCount() == 2) {
+                    if (fileTree.getModel().isLeaf(selPath.getLastPathComponent())) {
+                        //System.out.println(selPath);
+                        //System.out.println("path root: " + selPath.getPathComponent(0));
 
-                //children
-                for (int nameIndex = 1; nameIndex <= foundFile.getNameCount(); nameIndex++) {
-                    Path nodePath = rootNodePath.resolve(foundFile.subpath(0, nameIndex));
+                        //TODO не убирать пробелы в названии файла
+                        String filePath = selPath.toString().replaceAll("]| |\\[|", "").replaceFirst("Root,", "").replaceAll(",", Matcher.quoteReplacement(File.separator));
+                        System.out.println("filePath = " + filePath);
 
-                    DefaultMutableTreeNode newNode = new DefaultMutableTreeNode(nodePath.getFileName());
+                        try {
+                            fileContentTableModel.setFileFromReading(filePath);
+                            //fileContentTable.updateUI();
 
-                    if (fileTreeContentMap.putIfAbsent(nodePath, newNode) == null) {
-                        DefaultMutableTreeNode parentNode = fileTreeContentMap.getOrDefault(nodePath.getParent(), fileTreeRootNode);
-                        parentNode.add(newNode);
+                            //TODO сделать вместо updateUI
+                            ((AbstractTableModel) fileContentTable.getModel()).fireTableDataChanged();
+                        } catch (IOException ex) {
+                            ex.printStackTrace();
+                        }
                     }
                 }
-
-            });
-
-            java.net.URL imgURL = getClass().getClassLoader().getResource("gui-icons/any_type.png");
-            //if (imgURL != null) {
-            Icon imageIcon = new ImageIcon(imgURL);
-
-            DefaultTreeCellRenderer renderer = (DefaultTreeCellRenderer) fileTree.getCellRenderer();
-            renderer.setLeafIcon(imageIcon);
-
-            model.reload();
-        }
-    }
-
-    private void addNodeToFileTree(final Path foundFile) {
-        //add root of file tree
-        DefaultTreeModel model = (DefaultTreeModel) fileTree.getModel();
-        final DefaultMutableTreeNode fileTreeRootNode = (DefaultMutableTreeNode) model.getRoot();
-        //fileTreeRootNode.removeAllChildren();
-
-        //root
-        Path rootNodePath = foundFile.getRoot();
-        DefaultMutableTreeNode rootNode = new DefaultMutableTreeNode(rootNodePath);
-        if (fileTreeContentMap.putIfAbsent(rootNodePath, rootNode) == null) {
-            fileTreeRootNode.add(rootNode);
-            //model.reload(rootNode);
-            model.reload(fileTreeRootNode);
-        }
-
-        //children
-        for (int nameIndex = 1; nameIndex <= foundFile.getNameCount(); nameIndex++) {
-            Path nodePath = rootNodePath.resolve(foundFile.subpath(0, nameIndex));
-
-            DefaultMutableTreeNode newNode = new DefaultMutableTreeNode(nodePath.getFileName());
-
-            if (fileTreeContentMap.putIfAbsent(nodePath, newNode) == null) {
-                DefaultMutableTreeNode parentNode = fileTreeContentMap.getOrDefault(nodePath.getParent(), fileTreeRootNode);
-
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-
-                parentNode.add(newNode);
-
-                model.reload(parentNode);
-                fileTreeExpandedPaths.keySet().forEach(fileTree::expandPath);
+                //}
             }
-        }
+        };
+
+        fileTree.addMouseListener(ml);
+
+        fileContentTable.setShowGrid(false);
+        fileContentTable.setIntercellSpacing(new Dimension(5, 0));
+        fileContentTable.setTableHeader(null);
+        fileContentTable.getColumnModel().getColumn(0).setPreferredWidth(50);
+        fileContentTable.getColumnModel().getColumn(0).setMaxWidth(50);
+        fileContentTable.setAutoscrolls(true);
+        fileContentTable.getColumnModel().getColumn(0).setCellRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                Component rendererComp = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+
+                rendererComp.setBackground(new Color(228, 228, 228));
+                rendererComp.setForeground(new Color(128, 128, 128));
+                setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 5));
+                setHorizontalAlignment(JLabel.CENTER);
+                return rendererComp;
+            }
+        });
+        fileContentTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
     }
 
     private DefaultMutableTreeNode addNodeToFileTreeRefactored(final Path foundFile) {
@@ -229,11 +214,11 @@ public class MainMenu {
                 parentNode = (DefaultMutableTreeNode) model.getRoot();
             }
 
-            try {
+/*            try {
                 Thread.sleep(500);
             } catch (InterruptedException e) {
                 e.printStackTrace();
-            }
+            }*/
 
             parentNode.add(node);
 
