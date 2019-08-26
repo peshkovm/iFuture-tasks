@@ -5,14 +5,16 @@ import com.github.peshkovm.core.ReadBigFileTableModel;
 import com.github.peshkovm.core.WorkingWithFilesUtils;
 
 import javax.swing.*;
-import javax.swing.event.*;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
+import javax.swing.event.TreeExpansionEvent;
+import javax.swing.event.TreeExpansionListener;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import javax.swing.tree.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -21,7 +23,7 @@ import java.util.regex.Matcher;
 
 public class MainMenu {
     private JPanel menuPanel;
-    private JPanel treePanel;
+    private JPanel fileTreePanel;
     private JPanel fileContentPanel;
     private JPanel formPanel;
     private JTree fileTree;
@@ -54,6 +56,8 @@ public class MainMenu {
         frame.setContentPane(new MainMenu().formPanel);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(1000, 900);
+        frame.setMinimumSize(new Dimension(950, 855));
+        //frame.setResizable(false);
         //frame.pack();
         frame.setVisible(true);
     }
@@ -75,10 +79,29 @@ public class MainMenu {
         initializeFileContentTabbedPane();
 
         initializeSearchButton();
+
+        initializeFileContentPanel();
+
+        initializeFileTreePanel();
     }
 
     private void initializeSearchButton() {
         searchButton.addActionListener(e -> {
+
+            if (folderLocationTextField.getText().isEmpty()) {
+                JOptionPane.showMessageDialog(frame, "File location must not be empty");
+                return;
+            } else if (findingTextTextField.getText().isEmpty()) {
+                JOptionPane.showMessageDialog(frame, "Text to find must not be empty");
+                return;
+            } else if (fileExtensionTextField.getText().isEmpty()) {
+                JOptionPane.showMessageDialog(frame, "File extension must not be empty");
+                return;
+            }else if(!fileExtensionTextField.getText().startsWith(".")){
+                JOptionPane.showMessageDialog(frame, "File extension must start with .");
+                return;
+            }
+
             //fileContentTableModel.close();
             final File selectedFolder = new File(folderLocationTextField.getText());
 
@@ -226,6 +249,16 @@ public class MainMenu {
         });
     }
 
+    private void initializeFileTreePanel() {
+        fileTreePanel.setPreferredSize(new Dimension(300, -1));
+        fileTreePanel.setBorder(BorderFactory.createEmptyBorder(0, 5, 5, 5));
+    }
+
+    private void initializeFileContentPanel() {
+        fileContentPanel.setPreferredSize(new Dimension(600, -1));
+        fileContentPanel.setBorder(BorderFactory.createEmptyBorder(0, 4, 4, 4));
+    }
+
     private DefaultMutableTreeNode addNodeToFileTreeRefactored(final Path foundFile) {
         DefaultMutableTreeNode node = new DefaultMutableTreeNode(foundFile.getNameCount() == 0 ? foundFile : foundFile.getFileName());
 
@@ -353,8 +386,7 @@ public class MainMenu {
                 }
             });
 
-            setBackground(Color.WHITE);
-            setForeground(Color.WHITE);
+            //getViewport().setBackground(Color.WHITE);
         }
 
         FileContentTable getFileContentTable() {
