@@ -83,7 +83,8 @@ public class WorkingWithFilesUtils {
 
                             byte[] fileContent = Files.readAllBytes(file);
 
-                            if (boyerMooreHorspool.searchBytes(fileContent, textToFind.getBytes()) != -1) {
+                            int position = boyerMooreHorspool.searchBytes(fileContent, textToFind.getBytes());
+                            if (position != -1) {
                                 callback.addNode(file);
                                 //return FileVisitResult.TERMINATE;
                             }

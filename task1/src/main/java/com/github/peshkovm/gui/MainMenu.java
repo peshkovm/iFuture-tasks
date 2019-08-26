@@ -1,27 +1,22 @@
 package com.github.peshkovm.gui;
 
 import com.github.peshkovm.core.FileTreeFiller;
-import com.github.peshkovm.core.LogViewTableModel;
+import com.github.peshkovm.core.ReadBigFileTableModel;
 import com.github.peshkovm.core.WorkingWithFilesUtils;
 
 import javax.swing.*;
-import javax.swing.event.TreeExpansionEvent;
-import javax.swing.event.TreeExpansionListener;
-import javax.swing.event.TreeSelectionEvent;
-import javax.swing.event.TreeSelectionListener;
-import javax.swing.table.AbstractTableModel;
+import javax.swing.event.*;
 import javax.swing.table.DefaultTableCellRenderer;
-import javax.swing.table.DefaultTableModel;
-import javax.swing.table.TableColumnModel;
+import javax.swing.table.TableCellRenderer;
+import javax.swing.table.TableColumn;
 import javax.swing.tree.*;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
+import java.awt.event.*;
+import java.beans.PropertyChangeListener;
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Matcher;
 
 public class MainMenu {
@@ -40,13 +35,13 @@ public class MainMenu {
     private JTextField fileExtensionTextField;
     private JButton searchButton;
     private JScrollPane fileTreeScrollPane;
-    private JTable fileContentTable;
-    private JScrollPane fileContentTableScrollPane;
+    private JTabbedPane fileContentTabbedPane;
+    private JProgressBar fileTreeProgressBar;
 
+    private Map<Path, DefaultMutableTreeNode> fileTreeContentMap;
+    private HashMap<TreePath, TreePath> fileTreeExpandedPaths;
 
-    Map<Path, DefaultMutableTreeNode> fileTreeContentMap;
-    HashMap<TreePath, TreePath> fileTreeExpandedPaths;
-    LogViewTableModel fileContentTableModel = new LogViewTableModel();
+    static JFrame frame;
 
     public static void main(String[] args) {
         try {
@@ -55,7 +50,7 @@ public class MainMenu {
             e.printStackTrace();
         }
 
-        JFrame frame = new JFrame("MainMenu");
+        frame = new JFrame("MainMenu");
         frame.setContentPane(new MainMenu().formPanel);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(1000, 900);
@@ -71,10 +66,55 @@ public class MainMenu {
         // TODO: place custom component creation code here
         JFileChooser fileLocationChooser = new JFileChooser();
 
+        initializeFolderLocationButton(fileLocationChooser);
+
         initializeFileTree();
 
         initializeFileContentTable();
 
+        initializeFileContentTabbedPane();
+
+        initializeSearchButton();
+    }
+
+    private void initializeSearchButton() {
+        searchButton.addActionListener(e -> {
+            //fileContentTableModel.close();
+            final File selectedFolder = new File(folderLocationTextField.getText());
+
+            if (selectedFolder.exists() && selectedFolder.isDirectory()) {
+                final String textToFind = findingTextTextField.getText();
+                final String fileExtension = fileExtensionTextField.getText().substring(1);
+
+                java.net.URL imgURL = getClass().getClassLoader().getResource("gui-icons/any_type.png");
+                if (imgURL != null) {
+                    Icon imageIcon = new ImageIcon(imgURL);
+
+
+                    DefaultTreeCellRenderer renderer = (DefaultTreeCellRenderer) fileTree.getCellRenderer();
+                    renderer.setLeafIcon(imageIcon);
+                }
+
+                fileTreeContentMap = new HashMap<>();
+                fileTreeExpandedPaths = new HashMap<>();
+
+                DefaultTreeModel model = (DefaultTreeModel) fileTree.getModel();
+                ((DefaultMutableTreeNode) model.getRoot()).removeAllChildren();
+
+                FileTreeFiller callback = this::addNodeToFileTreeRefactored;
+                Thread thread = new Thread(() -> {
+                    fileTreeProgressBar.setIndeterminate(true);
+                    WorkingWithFilesUtils.findFilesContainingTextAndLazyFillTree(selectedFolder, textToFind, fileExtension, callback);
+                    fileTreeProgressBar.setIndeterminate(false);
+                });
+                thread.start();
+
+                System.out.println("After fill file tree");
+            }
+        });
+    }
+
+    private void initializeFolderLocationButton(JFileChooser fileLocationChooser) {
         folderLocationButton.addActionListener(e -> {
 
             fileLocationChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
@@ -86,34 +126,15 @@ public class MainMenu {
                 folderLocationTextField.setText(selectedFolder.toString());
             }
         });
+    }
 
-        searchButton.addActionListener(e -> {
-            final File selectedFolder = new File(folderLocationTextField.getText());
+    private void initializeFileTree() {
+        //create the root node
+        DefaultMutableTreeNode root = new DefaultMutableTreeNode("Root");
 
-            if (selectedFolder.exists() && selectedFolder.isDirectory()) {
-                final String textToFind = findingTextTextField.getText();
-                final String fileExtension = fileExtensionTextField.getText().substring(1);
-
-                java.net.URL imgURL = getClass().getClassLoader().getResource("gui-icons/any_type.png");
-                //if (imgURL != null) {
-                Icon imageIcon = new ImageIcon(imgURL);
-
-                DefaultTreeCellRenderer renderer = (DefaultTreeCellRenderer) fileTree.getCellRenderer();
-                renderer.setLeafIcon(imageIcon);
-
-                fileTreeContentMap = new HashMap<>();
-                fileTreeExpandedPaths = new HashMap<>();
-
-                DefaultTreeModel model = (DefaultTreeModel) fileTree.getModel();
-                ((DefaultMutableTreeNode) model.getRoot()).removeAllChildren();
-
-                FileTreeFiller callback = this::addNodeToFileTreeRefactored;
-                Thread thread = new Thread(() -> WorkingWithFilesUtils.findFilesContainingTextAndLazyFillTree(selectedFolder, textToFind, fileExtension, callback));
-                thread.start();
-
-                System.out.println("After fill file tree");
-            }
-        });
+        DefaultTreeModel model = (DefaultTreeModel) fileTree.getModel();
+        model.setRoot(root);
+        fileTree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
 
         fileTree.addTreeExpansionListener(new TreeExpansionListener() {
             @Override
@@ -130,46 +151,51 @@ public class MainMenu {
                 //fileTreeExpandedPaths.keySet().forEach(System.out::println);
             }
         });
-    }
 
-    private void initializeFileTree() {
-        //create the root node
-        DefaultMutableTreeNode root = new DefaultMutableTreeNode("Root");
-
-        DefaultTreeModel model = (DefaultTreeModel) fileTree.getModel();
-        model.setRoot(root);
-        fileTree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
         //fileTree.setRootVisible(false);
     }
 
     private void initializeFileContentTable() {
-        fileContentTable.setModel(fileContentTableModel);
-
+        //invokes when click fileTree node
         MouseListener ml = new MouseAdapter() {
             public void mousePressed(MouseEvent e) {
                 //int selRow = fileTree.getRowForLocation(e.getX(), e.getY());
 
                 TreePath selPath = fileTree.getPathForLocation(e.getX(), e.getY());
+
+                int tabCount = fileContentTabbedPane.getTabCount();
+
+                for (int tabIndex = 0; tabIndex < tabCount; tabIndex++) {
+                    if (((ButtonTabComponent) fileContentTabbedPane.getTabComponentAt(tabIndex)).filePath.equals(selPath)) {
+                        fileContentTabbedPane.setSelectedIndex(tabIndex);
+                        return;
+                    }
+                }
+
                 //if(selRow != -1) {
-                if (e.getClickCount() == 1) {
-                    fileTree.getSelectionModel().clearSelection();
-                } else if (e.getClickCount() == 2) {
-                    if (fileTree.getModel().isLeaf(selPath.getLastPathComponent())) {
-                        //System.out.println(selPath);
-                        //System.out.println("path root: " + selPath.getPathComponent(0));
+                if (selPath != null) {
+                    if (e.getClickCount() == 1) {
+                        fileTree.getSelectionModel().clearSelection();
+                    } else if (e.getClickCount() == 2) {
+                        if (fileTree.getModel().isLeaf(selPath.getLastPathComponent())) {
 
-                        //TODO не убирать пробелы в названии файла
-                        String filePath = selPath.toString().replaceAll("]| |\\[|", "").replaceFirst("Root,", "").replaceAll(",", Matcher.quoteReplacement(File.separator));
-                        System.out.println("filePath = " + filePath);
+                            String filePath = selPath.toString().replaceAll("\\]|\\[", "").replaceFirst("Root, ", "").replaceAll(", ", Matcher.quoteReplacement(File.separator));
+                            System.out.println("filePath = " + filePath);
 
-                        try {
-                            fileContentTableModel.setFileFromReading(filePath);
-                            //fileContentTable.updateUI();
+                            ReadBigFileTableModel fileContentTableModel = new ReadBigFileTableModel(filePath);
+                            FileContentTable fileContentTable = new FileContentTable(fileContentTableModel);
 
-                            //TODO сделать вместо updateUI
-                            ((AbstractTableModel) fileContentTable.getModel()).fireTableDataChanged();
-                        } catch (IOException ex) {
-                            ex.printStackTrace();
+                            FileContentTableScrollPane fileContentTableScrollPane = new FileContentTableScrollPane(fileContentTable);
+                            fileContentTableScrollPane.getFileContentTable().getModel().fireTableDataChanged();
+
+                            ButtonTabComponent buttonTabComponent = new ButtonTabComponent(selPath);
+                            buttonTabComponent.setBackground(Color.WHITE);
+
+                            fileContentTabbedPane.add(fileContentTableScrollPane);
+                            fileContentTabbedPane.setTabComponentAt(fileContentTabbedPane.getTabCount() - 1, buttonTabComponent);
+                            fileContentTabbedPane.setSelectedIndex(fileContentTabbedPane.getTabCount() - 1);
+
+                            //fileContentTable.changeSelection(100, 1, false, false);
                         }
                     }
                 }
@@ -178,26 +204,26 @@ public class MainMenu {
         };
 
         fileTree.addMouseListener(ml);
+    }
 
-        fileContentTable.setShowGrid(false);
-        fileContentTable.setIntercellSpacing(new Dimension(5, 0));
-        fileContentTable.setTableHeader(null);
-        fileContentTable.getColumnModel().getColumn(0).setPreferredWidth(50);
-        fileContentTable.getColumnModel().getColumn(0).setMaxWidth(50);
-        fileContentTable.setAutoscrolls(true);
-        fileContentTable.getColumnModel().getColumn(0).setCellRenderer(new DefaultTableCellRenderer() {
+    private void initializeFileContentTabbedPane() {
+        fileContentTabbedPane.addChangeListener(new ChangeListener() {
             @Override
-            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                Component rendererComp = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            public void stateChanged(ChangeEvent e) {
+                int tabCount = fileContentTabbedPane.getTabCount();
 
-                rendererComp.setBackground(new Color(228, 228, 228));
-                rendererComp.setForeground(new Color(128, 128, 128));
-                setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 5));
-                setHorizontalAlignment(JLabel.CENTER);
-                return rendererComp;
+                if (tabCount > 1) {
+                    System.out.println(fileContentTabbedPane.getSelectedIndex());
+                    int selectedIndex = fileContentTabbedPane.getSelectedIndex();
+                    fileContentTabbedPane.getTabComponentAt(selectedIndex).setBackground(Color.WHITE);
+
+                    for (int tabIndex = 0; tabIndex < tabCount; tabIndex++) {
+                        if (tabIndex != selectedIndex)
+                            fileContentTabbedPane.getTabComponentAt(tabIndex).setBackground(null);
+                    }
+                }
             }
         });
-        fileContentTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
     }
 
     private DefaultMutableTreeNode addNodeToFileTreeRefactored(final Path foundFile) {
@@ -214,12 +240,6 @@ public class MainMenu {
                 parentNode = (DefaultMutableTreeNode) model.getRoot();
             }
 
-/*            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }*/
-
             parentNode.add(node);
 
             model.reload(parentNode);
@@ -227,5 +247,172 @@ public class MainMenu {
         }
 
         return fileTreeContentMap.get(foundFile);
+    }
+
+    private class ButtonTabComponent extends JPanel {
+        final TreePath filePath;
+
+        public ButtonTabComponent(TreePath filePath) {
+            this.filePath = filePath;
+            String tabText = filePath.getLastPathComponent().toString();
+            JLabel label = new JLabel(tabText);
+            add(label);
+            //add more space between the label and the button
+            label.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 2));
+            //tab button
+            JButton button = new TabButton();
+            add(button);
+            //add more space to the top of the component
+            //setBorder(BorderFactory.createEmptyBorder(2, 0, 0, 0));
+        }
+
+        private class TabButton extends JButton implements ActionListener {
+            TabButton() {
+                setContentAreaFilled(false);
+                setFocusable(false);
+                setBorder(BorderFactory.createEtchedBorder());
+                setBorderPainted(false);
+                setRolloverEnabled(true);
+                int size = 17;
+                setPreferredSize(new Dimension(size, size));
+
+                java.net.URL imgURL = getClass().getClassLoader().getResource("gui-icons/close.png");
+                if (imgURL != null) {
+                    Icon closeIcon = new ImageIcon(imgURL);
+                    setIcon(closeIcon);
+                }
+
+                addActionListener(this);
+
+                //paint tab border
+                //TODO не работает
+                addMouseListener(new MouseAdapter() {
+                    public void mouseEntered(MouseEvent e) {
+                        setBorderPainted(true);
+                    }
+
+                    public void mouseExited(MouseEvent e) {
+                        setBorderPainted(false);
+                    }
+                });
+            }
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                int i = fileContentTabbedPane.indexOfTabComponent(ButtonTabComponent.this);
+                System.out.println("close button index = " + i);
+                if (i != -1) {
+                    fileContentTabbedPane.remove(i);
+                }
+            }
+
+        }
+    }
+
+    private static class FileContentTableScrollPane extends JScrollPane {
+        public FileContentTableScrollPane(FileContentTable fileContentTable) {
+            super(fileContentTable, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+
+            getVerticalScrollBar().addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseReleased(MouseEvent e) {
+                    //super.mouseReleased(e);
+                    System.out.println("Released");
+                    //JViewport viewport = getViewport();
+                    //FileContentTable fileContentTable = (FileContentTable) viewport.getView();
+                    fileContentTable.getModel().isMousePressed = false;
+                    fileContentTable.getModel().fireTableDataChanged();
+                }
+            });
+            getVerticalScrollBar().addMouseListener(new MouseAdapter() {
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    //super.mousePressed(e);
+                    System.out.println("Pressed");
+                    fileContentTable.getModel().isMousePressed = true;
+                }
+            });
+
+            getHorizontalScrollBar().addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseReleased(MouseEvent e) {
+                    //super.mouseReleased(e);
+                    System.out.println("Released");
+                    //JViewport viewport = getViewport();
+                    //FileContentTable fileContentTable = (FileContentTable) viewport.getView();
+                    fileContentTable.getModel().isMousePressed = false;
+                    fileContentTable.getModel().fireTableDataChanged();
+                }
+            });
+            getHorizontalScrollBar().addMouseListener(new MouseAdapter() {
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    //super.mousePressed(e);
+                    System.out.println("Pressed");
+                    fileContentTable.getModel().isMousePressed = true;
+                }
+            });
+
+            setBackground(Color.WHITE);
+            setForeground(Color.WHITE);
+        }
+
+        FileContentTable getFileContentTable() {
+            return (FileContentTable) getViewport().getView();
+        }
+    }
+
+    private static class FileContentTable extends JTable {
+        FileContentTable(ReadBigFileTableModel fileContentTableModel) {
+            super(fileContentTableModel);
+
+            setShowGrid(false);
+            setIntercellSpacing(new Dimension(5, 0));
+            setTableHeader(null);
+            //getColumnModel().getColumn(0).setPreferredWidth(50);
+            //getColumnModel().getColumn(0).setMaxWidth(50);
+            setAutoscrolls(true);
+            getColumnModel().getColumn(0).setCellRenderer(new DefaultTableCellRenderer() {
+                @Override
+                public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                    Component rendererComp = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+
+                    rendererComp.setBackground(new Color(228, 228, 228));
+                    rendererComp.setForeground(new Color(128, 128, 128));
+                    setBorder(BorderFactory.createEmptyBorder(0, 5, 0, 10));
+                    setHorizontalAlignment(JLabel.CENTER);
+                    return rendererComp;
+                }
+            });
+            setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+            adjustColumnsSize();
+        }
+
+        private void adjustColumnsSize() {
+            for (int colIndex = 0; colIndex < 2; colIndex++) {
+                TableColumn tableColumn = getColumnModel().getColumn(colIndex);
+                int preferredWidth = tableColumn.getMinWidth();
+                int row;
+
+                if (colIndex == 0)
+                    row = getModel().getRowCount() - 1;
+                else
+                    row = getModel().getNumOfLongestRow();
+
+                System.out.println("longest row = " + row);
+
+                TableCellRenderer cellRenderer = getCellRenderer(row, colIndex);
+                Component c = prepareRenderer(cellRenderer, row, colIndex);
+                int width = c.getPreferredSize().width + getIntercellSpacing().width;
+                preferredWidth = Math.max(preferredWidth, width);
+
+                tableColumn.setPreferredWidth(preferredWidth);
+            }
+        }
+
+        @Override
+        public ReadBigFileTableModel getModel() {
+            return (ReadBigFileTableModel) super.getModel();
+        }
     }
 }
