@@ -18,7 +18,9 @@ import java.awt.event.*;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 
 public class MainMenu {
@@ -41,7 +43,7 @@ public class MainMenu {
     private JProgressBar fileTreeProgressBar;
 
     private Map<Path, DefaultMutableTreeNode> fileTreeContentMap;
-    private HashMap<TreePath, TreePath> fileTreeExpandedPaths;
+    private Set<TreePath> fileTreeExpandedPaths;
 
     static JFrame frame;
 
@@ -97,7 +99,7 @@ public class MainMenu {
             } else if (fileExtensionTextField.getText().isEmpty()) {
                 JOptionPane.showMessageDialog(frame, "File extension must not be empty");
                 return;
-            }else if(!fileExtensionTextField.getText().startsWith(".")){
+            } else if (!fileExtensionTextField.getText().startsWith(".")) {
                 JOptionPane.showMessageDialog(frame, "File extension must start with .");
                 return;
             }
@@ -119,7 +121,7 @@ public class MainMenu {
                 }
 
                 fileTreeContentMap = new HashMap<>();
-                fileTreeExpandedPaths = new HashMap<>();
+                fileTreeExpandedPaths = new HashSet<>();
 
                 DefaultTreeModel model = (DefaultTreeModel) fileTree.getModel();
                 ((DefaultMutableTreeNode) model.getRoot()).removeAllChildren();
@@ -162,7 +164,7 @@ public class MainMenu {
         fileTree.addTreeExpansionListener(new TreeExpansionListener() {
             @Override
             public void treeExpanded(TreeExpansionEvent event) {
-                fileTreeExpandedPaths.putIfAbsent(event.getPath(), event.getPath());
+                fileTreeExpandedPaths.add(event.getPath());
                 //System.out.println("expanded path:" + event.getPath().getLastPathComponent());
                 //fileTreeExpandedPaths.keySet().forEach(System.out::println);
             }
@@ -276,7 +278,7 @@ public class MainMenu {
             parentNode.add(node);
 
             model.reload(parentNode);
-            fileTreeExpandedPaths.keySet().forEach(fileTree::expandPath);
+            fileTreeExpandedPaths.forEach(fileTree::expandPath);
         }
 
         return fileTreeContentMap.get(foundFile);
@@ -349,40 +351,40 @@ public class MainMenu {
             getVerticalScrollBar().addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseReleased(MouseEvent e) {
-                    //super.mouseReleased(e);
-                    System.out.println("Released");
-                    //JViewport viewport = getViewport();
-                    //FileContentTable fileContentTable = (FileContentTable) viewport.getView();
-                    fileContentTable.getModel().isMousePressed = false;
-                    fileContentTable.getModel().fireTableDataChanged();
+                    if (fileContentTable.getRowCount() > 5000) {
+                        System.out.println("Released");
+                        fileContentTable.getModel().isMousePressed = false;
+                        fileContentTable.getModel().fireTableDataChanged();
+                    }
                 }
             });
             getVerticalScrollBar().addMouseListener(new MouseAdapter() {
                 @Override
                 public void mousePressed(MouseEvent e) {
-                    //super.mousePressed(e);
-                    System.out.println("Pressed");
-                    fileContentTable.getModel().isMousePressed = true;
+                    if (fileContentTable.getRowCount() > 5000) {
+                        System.out.println("Pressed");
+                        fileContentTable.getModel().isMousePressed = true;
+                    }
                 }
             });
 
             getHorizontalScrollBar().addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseReleased(MouseEvent e) {
-                    //super.mouseReleased(e);
-                    System.out.println("Released");
-                    //JViewport viewport = getViewport();
-                    //FileContentTable fileContentTable = (FileContentTable) viewport.getView();
-                    fileContentTable.getModel().isMousePressed = false;
-                    fileContentTable.getModel().fireTableDataChanged();
+                    if (fileContentTable.getRowCount() > 5000) {
+                        System.out.println("Released");
+                        fileContentTable.getModel().isMousePressed = false;
+                        fileContentTable.getModel().fireTableDataChanged();
+                    }
                 }
             });
             getHorizontalScrollBar().addMouseListener(new MouseAdapter() {
                 @Override
                 public void mousePressed(MouseEvent e) {
-                    //super.mousePressed(e);
-                    System.out.println("Pressed");
-                    fileContentTable.getModel().isMousePressed = true;
+                    if (fileContentTable.getRowCount() > 5000) {
+                        System.out.println("Pressed");
+                        fileContentTable.getModel().isMousePressed = true;
+                    }
                 }
             });
 
