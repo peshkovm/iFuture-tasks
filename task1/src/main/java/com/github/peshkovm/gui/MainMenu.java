@@ -36,6 +36,7 @@ public class MainMenu {
     private JScrollPane fileTreeScrollPane;
     private JTabbedPane fileContentTabbedPane;
     private JProgressBar fileTreeProgressBar;
+    private JPanel fileTreeFileContentTextPaneSeparatorPanel;
 
     //Содержит пути файлов (нод) в дереве
     private Map<Path, DefaultMutableTreeNode> fileTreeMap;
@@ -71,13 +72,13 @@ public class MainMenu {
 
         initializeFileTree();
 
-        initializeFileContentTabbedPane();
-
         initializeSearchButton();
 
         initializeFileContentPanel();
 
         initializeFileTreePanel();
+
+        initializeFileTreeFileContentTextPaneSeparatorPanel();
     }
 
     private void initializeFrame() {
@@ -258,7 +259,7 @@ public class MainMenu {
                             System.out.println("filePath = " + filePath);
 
                             //Если нашлись файлы
-                            if (!filePath.equals(FILE_TREE_ROOT_NAME)) {
+                            if (!filePath.equals("")) {
                                 BigFileTableModel fileContentTableModel = new BigFileTableModel(filePath);
                                 FileContentTable fileContentTable = new FileContentTable(fileContentTableModel);
 
@@ -266,7 +267,7 @@ public class MainMenu {
                                 fileContentTableScrollPane.getFileContentTable().getModel().fireTableDataChanged();
 
                                 ButtonTabComponent buttonTabComponent = new ButtonTabComponent(selPath);
-                                buttonTabComponent.setBackground(Color.WHITE);
+                                buttonTabComponent.setBackground(null);
 
                                 fileContentTabbedPane.add(fileContentTableScrollPane);
                                 fileContentTabbedPane.setTabComponentAt(fileContentTabbedPane.getTabCount() - 1, buttonTabComponent);
@@ -290,27 +291,6 @@ public class MainMenu {
         //fileTree.setRootVisible(false);
     }
 
-    private void initializeFileContentTabbedPane() {
-        fileContentTabbedPane.addChangeListener(e -> {
-            int tabCount = fileContentTabbedPane.getTabCount();
-
-            System.out.println("tab changed");
-
-            if (tabCount > 0) {
-                System.out.println(fileContentTabbedPane.getSelectedIndex());
-                int selectedIndex = fileContentTabbedPane.getSelectedIndex();
-                if (fileContentTabbedPane.getTabComponentAt(selectedIndex) != null) {
-                    fileContentTabbedPane.getTabComponentAt(selectedIndex).setBackground(Color.WHITE);
-
-                    for (int tabIndex = 0; tabIndex < tabCount; tabIndex++) {
-                        if (tabIndex != selectedIndex)
-                            fileContentTabbedPane.getTabComponentAt(tabIndex).setBackground(null);
-                    }
-                }
-            }
-        });
-    }
-
     private void initializeFileTreePanel() {
         fileTreePanel.setPreferredSize(new Dimension(300, -1));
         fileTreePanel.setBorder(BorderFactory.createEmptyBorder(0, 5, 5, 5));
@@ -319,6 +299,10 @@ public class MainMenu {
     private void initializeFileContentPanel() {
         fileContentPanel.setPreferredSize(new Dimension(600, -1));
         fileContentPanel.setBorder(BorderFactory.createEmptyBorder(0, 4, 4, 4));
+    }
+
+    private void initializeFileTreeFileContentTextPaneSeparatorPanel() {
+        fileTreeFileContentTextPaneSeparatorPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 5, 0));
     }
 
     //Добавляет ноду в fileTree
@@ -417,7 +401,9 @@ public class MainMenu {
         public FileContentTableScrollPane(FileContentTable fileContentTable) {
             super(fileContentTable, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
 
-            //Для файлов больше 5000 строк при зажатии и перемещении
+            final int FILE_MAX_SIZE = 1000;
+
+            //Для файла размера больше 1000 при зажатии и перемещении
             //вертикального и горизонтального скролбаров соднржимое файла не будет грузиться.
             //Содержимое файла загрузится только при отпуске скролбара.
             //Благодаря этому, пользователь может быстро перемещатся по большому файлу
@@ -425,7 +411,7 @@ public class MainMenu {
             getVerticalScrollBar().addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseReleased(MouseEvent e) {
-                    if (fileContentTable.getRowCount() > 5000) {
+                    if (fileContentTable.getModel().getFileSize() > FILE_MAX_SIZE) {
                         System.out.println("Released");
                         fileContentTable.getModel().isMousePressed = false;
                         fileContentTable.getModel().fireTableDataChanged();
@@ -435,7 +421,7 @@ public class MainMenu {
             getVerticalScrollBar().addMouseListener(new MouseAdapter() {
                 @Override
                 public void mousePressed(MouseEvent e) {
-                    if (fileContentTable.getRowCount() > 5000) {
+                    if (fileContentTable.getModel().getFileSize() > FILE_MAX_SIZE) {
                         System.out.println("Pressed");
                         fileContentTable.getModel().isMousePressed = true;
                     }
@@ -445,7 +431,7 @@ public class MainMenu {
             getHorizontalScrollBar().addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseReleased(MouseEvent e) {
-                    if (fileContentTable.getRowCount() > 5000) {
+                    if (fileContentTable.getModel().getFileSize() > FILE_MAX_SIZE) {
                         System.out.println("Released");
                         fileContentTable.getModel().isMousePressed = false;
                         fileContentTable.getModel().fireTableDataChanged();
@@ -455,7 +441,7 @@ public class MainMenu {
             getHorizontalScrollBar().addMouseListener(new MouseAdapter() {
                 @Override
                 public void mousePressed(MouseEvent e) {
-                    if (fileContentTable.getRowCount() > 5000) {
+                    if (fileContentTable.getModel().getFileSize() > FILE_MAX_SIZE) {
                         System.out.println("Pressed");
                         fileContentTable.getModel().isMousePressed = true;
                     }
