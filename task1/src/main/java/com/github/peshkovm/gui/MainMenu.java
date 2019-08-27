@@ -5,10 +5,7 @@ import com.github.peshkovm.core.ReadBigFileTableModel;
 import com.github.peshkovm.core.WorkingWithFilesUtils;
 
 import javax.swing.*;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
-import javax.swing.event.TreeExpansionEvent;
-import javax.swing.event.TreeExpansionListener;
+import javax.swing.event.*;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
@@ -18,6 +15,7 @@ import java.awt.event.*;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.List;
 import java.util.regex.Matcher;
 
 public class MainMenu {
@@ -41,7 +39,8 @@ public class MainMenu {
 
     private Map<Path, DefaultMutableTreeNode> fileTreeContentMap;
     private Set<TreePath> fileTreeExpandedPaths;
-    private java.util.List<FileContentTableScrollPane> fileContentTableScrollPaneList = new ArrayList<>();
+    private final java.util.List<FileContentTableScrollPane> fileContentTableScrollPaneList = new ArrayList<>();
+    private final JFileChooser fileLocationChooser = new JFileChooser();
 
     static JFrame frame;
 
@@ -54,13 +53,6 @@ public class MainMenu {
 
         frame = new JFrame("MainMenu");
         frame.setContentPane(new MainMenu().formPanel);
-
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(1000, 900);
-        frame.setMinimumSize(new Dimension(950, 855));
-        //frame.setResizable(false);
-        //frame.pack();
-        frame.setVisible(true);
     }
 
     public MainMenu() {
@@ -70,13 +62,9 @@ public class MainMenu {
     private void createUIComponents() {
         initializeFrame();
 
-        JFileChooser fileLocationChooser = new JFileChooser();
-
-        initializeFolderLocationButton(fileLocationChooser);
+        initializeFolderLocationButton();
 
         initializeFileTree();
-
-        initializeFileContentTable();
 
         initializeFileContentTabbedPane();
 
@@ -88,6 +76,13 @@ public class MainMenu {
     }
 
     private void initializeFrame() {
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(1000, 900);
+        frame.setMinimumSize(new Dimension(950, 855));
+        //frame.setResizable(false);
+        //frame.pack();
+        frame.setVisible(true);
+
         frame.addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
@@ -116,17 +111,17 @@ public class MainMenu {
             } else if (fileExtensionTextField.getText().isEmpty()) {
                 JOptionPane.showMessageDialog(frame, "File extension must not be empty");
                 return;
-            } else if (!fileExtensionTextField.getText().startsWith(".")) {
+            }/* else if (!fileExtensionTextField.getText().startsWith(".")) {
                 JOptionPane.showMessageDialog(frame, "File extension must start with .");
                 return;
-            }
+            }*/
 
             //fileContentTableModel.close();
             final File selectedFolder = new File(folderLocationTextField.getText());
 
             if (selectedFolder.exists() && selectedFolder.isDirectory()) {
                 final String textToFind = findingTextTextField.getText();
-                final String fileExtension = fileExtensionTextField.getText().substring(1);
+                final String fileExtension = fileExtensionTextField.getText();
 
                 java.net.URL imgURL = getClass().getClassLoader().getResource("gui-icons/any_type.png");
                 if (imgURL != null) {
@@ -151,12 +146,36 @@ public class MainMenu {
                 });
                 thread.start();
 
+/*                //background task
+                new SwingWorker<Void, DefaultMutableTreeNode>() {
+
+                    @Override
+                    protected Void doInBackground() throws Exception {
+                        searchFiles.traverseTree(Paths.get(pathText.getText()), extension.getText().isEmpty() ? "*" : extension.getText(), textToSearch.getText(), path -> publish(updateTree(path, map)));
+                        return null;
+                    }
+
+                    //edt
+                    @Override
+                    protected void process(List<DefaultMutableTreeNode> nodes) {
+                        for (DefaultMutableTreeNode file : nodes) {
+                            ((DefaultTreeModel) tree.getModel()).reload(file);
+                        }
+                        fileTreeExpandedPaths.forEach(tree::expandPath);
+                    }
+
+                    @Override
+                    protected void done() {
+                        super.done();
+                    }
+                }.execute();*/
+
                 System.out.println("After fill file tree");
             }
         });
     }
 
-    private void initializeFolderLocationButton(JFileChooser fileLocationChooser) {
+    private void initializeFolderLocationButton() {
         folderLocationButton.addActionListener(e -> {
 
             fileLocationChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
@@ -194,12 +213,7 @@ public class MainMenu {
             }
         });
 
-        //fileTree.setRootVisible(false);
-    }
-
-    private void initializeFileContentTable() {
-        //invokes when click fileTree node
-        MouseListener ml = new MouseAdapter() {
+        fileTree.addMouseListener(new MouseAdapter() {
             public void mousePressed(MouseEvent e) {
                 //int selRow = fileTree.getRowForLocation(e.getX(), e.getY());
 
@@ -249,20 +263,21 @@ public class MainMenu {
                 }
                 //}
             }
-        };
+        });
 
-        fileTree.addMouseListener(ml);
+        //fileTree.setRootVisible(false);
     }
 
     private void initializeFileContentTabbedPane() {
-        fileContentTabbedPane.addChangeListener(new ChangeListener() {
-            @Override
-            public void stateChanged(ChangeEvent e) {
-                int tabCount = fileContentTabbedPane.getTabCount();
+        fileContentTabbedPane.addChangeListener(e -> {
+            int tabCount = fileContentTabbedPane.getTabCount();
 
-                if (tabCount > 1) {
-                    System.out.println(fileContentTabbedPane.getSelectedIndex());
-                    int selectedIndex = fileContentTabbedPane.getSelectedIndex();
+            System.out.println("tab changed");
+
+            if (tabCount > 0) {
+                System.out.println(fileContentTabbedPane.getSelectedIndex());
+                int selectedIndex = fileContentTabbedPane.getSelectedIndex();
+                if (fileContentTabbedPane.getTabComponentAt(selectedIndex) != null) {
                     fileContentTabbedPane.getTabComponentAt(selectedIndex).setBackground(Color.WHITE);
 
                     for (int tabIndex = 0; tabIndex < tabCount; tabIndex++) {

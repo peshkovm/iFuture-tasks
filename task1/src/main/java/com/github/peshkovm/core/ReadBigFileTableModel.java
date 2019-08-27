@@ -17,7 +17,6 @@ public class ReadBigFileTableModel extends AbstractTableModel {
     private static final String[] COLUMN_NAMES = {"Line", "Text"};
     private static final Class<?>[] COLUMN_CLASSES = {Integer.class, String.class};
 
-    //private final List<WeakReference<TableModelListener>> listeners = new LinkedList<>();
     private final List<Integer> linePositions = new ArrayList<>();
     private RandomAccessFile randomAccessFile;
     private MappedByteBuffer buffer;
@@ -25,9 +24,6 @@ public class ReadBigFileTableModel extends AbstractTableModel {
     private String filePath;
     public boolean isMousePressed = false;
     private int numOfLongestRow;
-
-    public ReadBigFileTableModel() {
-    }
 
     public ReadBigFileTableModel(String filePath) {
         try {
@@ -120,7 +116,7 @@ public class ReadBigFileTableModel extends AbstractTableModel {
     @Override
     public Object getValueAt(int i, int i1) {
         if (!isMousePressed) {
-            //System.out.println("row = " + (i + 1));
+            System.out.println("row = " + (i + 1));
 
             switch (i1) {
                 case 0: {

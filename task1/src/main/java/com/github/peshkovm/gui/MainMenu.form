@@ -88,7 +88,7 @@
             </constraints>
             <properties>
               <horizontalAlignment value="2"/>
-              <text value=".java"/>
+              <text value="java"/>
             </properties>
           </component>
           <component id="6f7bc" class="javax.swing.JButton" binding="searchButton">
