@@ -120,7 +120,7 @@ public class ReadBigFileTableModel extends AbstractTableModel {
     @Override
     public Object getValueAt(int i, int i1) {
         if (!isMousePressed) {
-            System.out.println("row = " + (i + 1));
+            //System.out.println("row = " + (i + 1));
 
             switch (i1) {
                 case 0: {

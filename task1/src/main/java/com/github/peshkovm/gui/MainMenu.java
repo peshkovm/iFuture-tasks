@@ -17,10 +17,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 
 public class MainMenu {
@@ -44,6 +41,7 @@ public class MainMenu {
 
     private Map<Path, DefaultMutableTreeNode> fileTreeContentMap;
     private Set<TreePath> fileTreeExpandedPaths;
+    private java.util.List<FileContentTableScrollPane> fileContentTableScrollPaneList = new ArrayList<>();
 
     static JFrame frame;
 
@@ -56,6 +54,7 @@ public class MainMenu {
 
         frame = new JFrame("MainMenu");
         frame.setContentPane(new MainMenu().formPanel);
+
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(1000, 900);
         frame.setMinimumSize(new Dimension(950, 855));
@@ -69,7 +68,8 @@ public class MainMenu {
     }
 
     private void createUIComponents() {
-        // TODO: place custom component creation code here
+        initializeFrame();
+
         JFileChooser fileLocationChooser = new JFileChooser();
 
         initializeFolderLocationButton(fileLocationChooser);
@@ -85,6 +85,23 @@ public class MainMenu {
         initializeFileContentPanel();
 
         initializeFileTreePanel();
+    }
+
+    private void initializeFrame() {
+        frame.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                System.out.println("Closed");
+                fileContentTableScrollPaneList.stream()
+                        .map(FileContentTableScrollPane::getFileContentTable)
+                        .map(FileContentTable::getModel)
+                        .forEach(model -> {
+                            model.close();
+                            System.out.println("model is closed");
+                        });
+                e.getWindow().dispose();
+            }
+        });
     }
 
     private void initializeSearchButton() {
@@ -191,7 +208,7 @@ public class MainMenu {
                 int tabCount = fileContentTabbedPane.getTabCount();
 
                 for (int tabIndex = 0; tabIndex < tabCount; tabIndex++) {
-                    if (((ButtonTabComponent) fileContentTabbedPane.getTabComponentAt(tabIndex)).filePath.equals(selPath)) {
+                    if (((ButtonTabComponent) fileContentTabbedPane.getTabComponentAt(tabIndex)).getFilePath().equals(selPath)) {
                         fileContentTabbedPane.setSelectedIndex(tabIndex);
                         return;
                     }
@@ -219,6 +236,12 @@ public class MainMenu {
                             fileContentTabbedPane.add(fileContentTableScrollPane);
                             fileContentTabbedPane.setTabComponentAt(fileContentTabbedPane.getTabCount() - 1, buttonTabComponent);
                             fileContentTabbedPane.setSelectedIndex(fileContentTabbedPane.getTabCount() - 1);
+
+                            fileContentTableScrollPaneList.add(fileContentTableScrollPane);
+
+                            for (int i = 0; i < fileContentTableScrollPaneList.size(); i++) {
+                                System.out.println("index = " + i + " pane = " + ((ButtonTabComponent) fileContentTabbedPane.getTabComponentAt(i)).getFilePath());
+                            }
 
                             //fileContentTable.changeSelection(100, 1, false, false);
                         }
@@ -285,7 +308,7 @@ public class MainMenu {
     }
 
     private class ButtonTabComponent extends JPanel {
-        final TreePath filePath;
+        private final TreePath filePath;
 
         public ButtonTabComponent(TreePath filePath) {
             this.filePath = filePath;
@@ -334,13 +357,19 @@ public class MainMenu {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                int i = fileContentTabbedPane.indexOfTabComponent(ButtonTabComponent.this);
-                System.out.println("close button index = " + i);
-                if (i != -1) {
-                    fileContentTabbedPane.remove(i);
+                int tabIndex = fileContentTabbedPane.indexOfTabComponent(ButtonTabComponent.this);
+                System.out.println("close button index = " + tabIndex);
+                if (tabIndex != -1) {
+                    fileContentTableScrollPaneList.get(tabIndex).getFileContentTable().getModel().close();
+                    fileContentTabbedPane.remove(tabIndex);
+                    fileContentTableScrollPaneList.remove(tabIndex);
                 }
             }
 
+        }
+
+        public TreePath getFilePath() {
+            return filePath;
         }
     }
 
