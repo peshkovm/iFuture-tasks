@@ -1,4 +1,4 @@
-package com.github.peshkovm.core;
+package com.github.peshkovm.gui;
 
 import javax.swing.table.AbstractTableModel;
 import java.io.IOException;
@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class ReadBigFileTableModel extends AbstractTableModel {
+public class BigFileTableModel extends AbstractTableModel {
 
     private static final int COLUMN_COUNT = 2;
     private static final String[] COLUMN_NAMES = {"Line", "Text"};
@@ -25,7 +25,7 @@ public class ReadBigFileTableModel extends AbstractTableModel {
     public boolean isMousePressed = false;
     private int numOfLongestRow;
 
-    public ReadBigFileTableModel(String filePath) {
+    public BigFileTableModel(String filePath) {
         try {
             setFilePath(filePath);
             readFile();
@@ -46,7 +46,7 @@ public class ReadBigFileTableModel extends AbstractTableModel {
                 randomAccessFile.close();
                 System.gc();
             } catch (IOException ex) {
-                Logger.getLogger(ReadBigFileTableModel.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(BigFileTableModel.class.getName()).log(Level.SEVERE, null, ex);
             }
             randomAccessFile = null;
         }
@@ -113,6 +113,11 @@ public class ReadBigFileTableModel extends AbstractTableModel {
         return false; //ii == 1;
     }
 
+    /*
+    Вызывается EDT в момент прорисовки таблицы.
+    Возвращается только часть файла, которая будет видна на экране.
+    Весь файл не возвращается, экономя время получения значения из буфера.
+     */
     @Override
     public Object getValueAt(int i, int i1) {
         if (!isMousePressed) {

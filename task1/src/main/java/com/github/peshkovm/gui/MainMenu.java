@@ -1,11 +1,10 @@
 package com.github.peshkovm.gui;
 
-import com.github.peshkovm.core.FileTreeFiller;
-import com.github.peshkovm.core.ReadBigFileTableModel;
 import com.github.peshkovm.core.WorkingWithFilesUtils;
 
 import javax.swing.*;
-import javax.swing.event.*;
+import javax.swing.event.TreeExpansionEvent;
+import javax.swing.event.TreeExpansionListener;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
@@ -14,8 +13,9 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
 import java.nio.file.Path;
-import java.util.*;
 import java.util.List;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 
 public class MainMenu {
@@ -37,10 +37,15 @@ public class MainMenu {
     private JTabbedPane fileContentTabbedPane;
     private JProgressBar fileTreeProgressBar;
 
-    private Map<Path, DefaultMutableTreeNode> fileTreeContentMap;
+    //Содержит пути файлов (нод) в дереве
+    private Map<Path, DefaultMutableTreeNode> fileTreeMap;
+    //Содержит пути нод в дереве, которые надо раскрыть
     private Set<TreePath> fileTreeExpandedPaths;
+    //Содержит все открытые FileContentTableScrollPane
+    //чтобы до них можно было доступиться и очистить занимаемые ресурсы
     private final java.util.List<FileContentTableScrollPane> fileContentTableScrollPaneList = new ArrayList<>();
     private final JFileChooser fileLocationChooser = new JFileChooser();
+    private final static String FILE_TREE_ROOT_NAME = "Root";
 
     static JFrame frame;
 
@@ -51,7 +56,7 @@ public class MainMenu {
             e.printStackTrace();
         }
 
-        frame = new JFrame("MainMenu");
+        frame = new JFrame("iFuture task 1");
         frame.setContentPane(new MainMenu().formPanel);
     }
 
@@ -132,43 +137,49 @@ public class MainMenu {
                     renderer.setLeafIcon(imageIcon);
                 }
 
-                fileTreeContentMap = new HashMap<>();
-                fileTreeExpandedPaths = new HashSet<>();
+                fileTreeMap = new HashMap<>();
+                fileTreeExpandedPaths = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
                 DefaultTreeModel model = (DefaultTreeModel) fileTree.getModel();
                 ((DefaultMutableTreeNode) model.getRoot()).removeAllChildren();
 
-                FileTreeFiller callback = this::addNodeToFileTreeRefactored;
-                Thread thread = new Thread(() -> {
-                    fileTreeProgressBar.setIndeterminate(true);
-                    WorkingWithFilesUtils.findFilesContainingTextAndLazyFillTree(selectedFolder, textToFind, fileExtension, callback);
-                    fileTreeProgressBar.setIndeterminate(false);
-                });
-                thread.start();
-
-/*                //background task
-                new SwingWorker<Void, DefaultMutableTreeNode>() {
+                /////////////////////////////////////////////////
+                //background task
+                SwingWorker<Void, Path> worker = new SwingWorker<>() {
 
                     @Override
-                    protected Void doInBackground() throws Exception {
-                        searchFiles.traverseTree(Paths.get(pathText.getText()), extension.getText().isEmpty() ? "*" : extension.getText(), textToSearch.getText(), path -> publish(updateTree(path, map)));
+                    protected Void doInBackground() {
+                        fileTreeProgressBar.setIndeterminate(true);
+
+                        WorkingWithFilesUtils.findFilesContainingTextAndLazyFillTree(selectedFolder, textToFind, fileExtension, this::publish);
+
                         return null;
                     }
 
                     //edt
                     @Override
-                    protected void process(List<DefaultMutableTreeNode> nodes) {
-                        for (DefaultMutableTreeNode file : nodes) {
-                            ((DefaultTreeModel) tree.getModel()).reload(file);
-                        }
-                        fileTreeExpandedPaths.forEach(tree::expandPath);
+                    protected void process(List<Path> nodes) {
+                        nodes.forEach(filePath -> addNodeToFileTree(filePath));
                     }
 
                     @Override
                     protected void done() {
-                        super.done();
+                        fileTreeProgressBar.setIndeterminate(false);
                     }
-                }.execute();*/
+                };
+                worker.execute();
+                /////////////////////////////////////////////////
+
+                //Добавляет ноду в дерево при нахождении нового файла.
+                //Благодаря этому, пользователь может просматривать файлы,
+                //не дожидаясь полного построения дерева.
+/*                FileTreeFiller callback = this::addNodeToFileTree;
+                Thread thread = new Thread(() -> {
+                    fileTreeProgressBar.setIndeterminate(true);
+                    WorkingWithFilesUtils.findFilesContainingTextAndLazyFillTree(selectedFolder, textToFind, fileExtension, callback);
+                    fileTreeProgressBar.setIndeterminate(false);
+                });
+                thread.start();*/
 
                 System.out.println("After fill file tree");
             }
@@ -191,7 +202,7 @@ public class MainMenu {
 
     private void initializeFileTree() {
         //create the root node
-        DefaultMutableTreeNode root = new DefaultMutableTreeNode("Root");
+        DefaultMutableTreeNode root = new DefaultMutableTreeNode(FILE_TREE_ROOT_NAME);
 
         DefaultTreeModel model = (DefaultTreeModel) fileTree.getModel();
         model.setRoot(root);
@@ -235,29 +246,40 @@ public class MainMenu {
                     } else if (e.getClickCount() == 2) {
                         if (fileTree.getModel().isLeaf(selPath.getLastPathComponent())) {
 
-                            String filePath = selPath.toString().replaceAll("\\]|\\[", "").replaceFirst("Root, ", "").replaceAll(", ", Matcher.quoteReplacement(File.separator));
-                            System.out.println("filePath = " + filePath);
+                            //String filePath = selPath.toString().replaceAll("\\]|\\[", "").replaceFirst(FILE_TREE_ROOT_NAME + ", ", "").replaceAll(", ", Matcher.quoteReplacement(File.separator));
+                            String filePath = "";
 
-                            ReadBigFileTableModel fileContentTableModel = new ReadBigFileTableModel(filePath);
-                            FileContentTable fileContentTable = new FileContentTable(fileContentTableModel);
-
-                            FileContentTableScrollPane fileContentTableScrollPane = new FileContentTableScrollPane(fileContentTable);
-                            fileContentTableScrollPane.getFileContentTable().getModel().fireTableDataChanged();
-
-                            ButtonTabComponent buttonTabComponent = new ButtonTabComponent(selPath);
-                            buttonTabComponent.setBackground(Color.WHITE);
-
-                            fileContentTabbedPane.add(fileContentTableScrollPane);
-                            fileContentTabbedPane.setTabComponentAt(fileContentTabbedPane.getTabCount() - 1, buttonTabComponent);
-                            fileContentTabbedPane.setSelectedIndex(fileContentTabbedPane.getTabCount() - 1);
-
-                            fileContentTableScrollPaneList.add(fileContentTableScrollPane);
-
-                            for (int i = 0; i < fileContentTableScrollPaneList.size(); i++) {
-                                System.out.println("index = " + i + " pane = " + ((ButtonTabComponent) fileContentTabbedPane.getTabComponentAt(i)).getFilePath());
+                            for (int pathCompIndex = 1; pathCompIndex < selPath.getPathCount(); pathCompIndex++) {
+                                filePath = filePath.concat(selPath.getPathComponent(pathCompIndex).toString());
+                                if (pathCompIndex < selPath.getPathCount() - 1)
+                                    filePath = filePath.concat(Matcher.quoteReplacement(File.separator));
                             }
 
-                            //fileContentTable.changeSelection(100, 1, false, false);
+                            System.out.println("filePath = " + filePath);
+
+                            //Если нашлись файлы
+                            if (!filePath.equals(FILE_TREE_ROOT_NAME)) {
+                                BigFileTableModel fileContentTableModel = new BigFileTableModel(filePath);
+                                FileContentTable fileContentTable = new FileContentTable(fileContentTableModel);
+
+                                FileContentTableScrollPane fileContentTableScrollPane = new FileContentTableScrollPane(fileContentTable);
+                                fileContentTableScrollPane.getFileContentTable().getModel().fireTableDataChanged();
+
+                                ButtonTabComponent buttonTabComponent = new ButtonTabComponent(selPath);
+                                buttonTabComponent.setBackground(Color.WHITE);
+
+                                fileContentTabbedPane.add(fileContentTableScrollPane);
+                                fileContentTabbedPane.setTabComponentAt(fileContentTabbedPane.getTabCount() - 1, buttonTabComponent);
+                                fileContentTabbedPane.setSelectedIndex(fileContentTabbedPane.getTabCount() - 1);
+
+                                fileContentTableScrollPaneList.add(fileContentTableScrollPane);
+
+                                for (int i = 0; i < fileContentTableScrollPaneList.size(); i++) {
+                                    System.out.println("index = " + i + " pane = " + ((ButtonTabComponent) fileContentTabbedPane.getTabComponentAt(i)).getFilePath());
+                                }
+
+                                //fileContentTable.changeSelection(100, 1, false, false);
+                            }
                         }
                     }
                 }
@@ -299,15 +321,18 @@ public class MainMenu {
         fileContentPanel.setBorder(BorderFactory.createEmptyBorder(0, 4, 4, 4));
     }
 
-    private DefaultMutableTreeNode addNodeToFileTreeRefactored(final Path foundFile) {
+    //Добавляет ноду в fileTree
+    //Обходит дерево, начиная с имени файла,
+    //тем самым экономя количество обращений к HashMap
+    private DefaultMutableTreeNode addNodeToFileTree(final Path foundFile) {
         DefaultMutableTreeNode node = new DefaultMutableTreeNode(foundFile.getNameCount() == 0 ? foundFile : foundFile.getFileName());
 
-        if (fileTreeContentMap.putIfAbsent(foundFile, node) == null) {
+        if (fileTreeMap.putIfAbsent(foundFile, node) == null) {
             DefaultMutableTreeNode parentNode;
             DefaultTreeModel model = (DefaultTreeModel) fileTree.getModel();
 
             if (foundFile.getParent() != null)
-                parentNode = addNodeToFileTreeRefactored(foundFile.getParent());
+                parentNode = addNodeToFileTree(foundFile.getParent());
             else {
                 //Root of file tree
                 parentNode = (DefaultMutableTreeNode) model.getRoot();
@@ -319,7 +344,7 @@ public class MainMenu {
             fileTreeExpandedPaths.forEach(fileTree::expandPath);
         }
 
-        return fileTreeContentMap.get(foundFile);
+        return fileTreeMap.get(foundFile);
     }
 
     private class ButtonTabComponent extends JPanel {
@@ -392,6 +417,11 @@ public class MainMenu {
         public FileContentTableScrollPane(FileContentTable fileContentTable) {
             super(fileContentTable, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
 
+            //Для файлов больше 5000 строк при зажатии и перемещении
+            //вертикального и горизонтального скролбаров соднржимое файла не будет грузиться.
+            //Содержимое файла загрузится только при отпуске скролбара.
+            //Благодаря этому, пользователь может быстро перемещатся по большому файлу
+            //без тормозов скролбара.
             getVerticalScrollBar().addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseReleased(MouseEvent e) {
@@ -441,7 +471,7 @@ public class MainMenu {
     }
 
     private static class FileContentTable extends JTable {
-        FileContentTable(ReadBigFileTableModel fileContentTableModel) {
+        FileContentTable(BigFileTableModel fileContentTableModel) {
             super(fileContentTableModel);
 
             setShowGrid(false);
@@ -489,8 +519,8 @@ public class MainMenu {
         }
 
         @Override
-        public ReadBigFileTableModel getModel() {
-            return (ReadBigFileTableModel) super.getModel();
+        public BigFileTableModel getModel() {
+            return (BigFileTableModel) super.getModel();
         }
     }
 }
