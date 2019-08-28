@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 public class WorkingWithFilesUtils {
 
@@ -69,7 +71,7 @@ public class WorkingWithFilesUtils {
         return foundFiles;
     }
 
-    public static void findFilesContainingTextAndLazyFillTree(final File directory, final String textToFind, final String fileExtension, final Consumer<Path> consumer) throws RuntimeException {
+    public static void findFilesContainingTextAndLazyFillTree(final File directory, final String textToFind, final String fileExtension, final Consumer<Path> consumer, final Supplier<Boolean> supplier) throws RuntimeException {
         final Path directoryPath = directory.toPath();
 
         final BoyerMooreHorspool boyerMooreHorspool = new BoyerMooreHorspool();
@@ -77,7 +79,12 @@ public class WorkingWithFilesUtils {
         try {
             Files.walkFileTree(directoryPath, new SimpleFileVisitor<>() {
                 @Override
-                public FileVisitResult visitFile(final Path filePath, final BasicFileAttributes attrs) throws IOException {
+                public FileVisitResult visitFile(final Path filePath, final BasicFileAttributes attrs) {
+
+                    if (supplier.get()) {
+                        System.out.println("findFilesContainingTextAndLazyFillTree cancelled");
+                        return FileVisitResult.TERMINATE;
+                    }
 
                     try {
                         //System.out.println("\n visited file = " + file.getFileName() + "\n");

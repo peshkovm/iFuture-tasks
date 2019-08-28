@@ -39,6 +39,8 @@ public class MainMenu {
     private JTabbedPane fileContentTabbedPane;
     private JProgressBar fileTreeProgressBar;
     private JPanel fileTreeFileContentTextPaneSeparatorPanel;
+    private JPanel searchAndCancelButtonsPanel;
+    private JButton cancelButton;
 
     //Содержит пути файлов (нод) в дереве
     private Map<Path, DefaultMutableTreeNode> fileTreeMap;
@@ -49,9 +51,10 @@ public class MainMenu {
     private final java.util.List<FileContentTableScrollPane> fileContentTableScrollPaneList = new ArrayList<>();
     private final JFileChooser fileLocationChooser = new JFileChooser();
     private final static String FILE_TREE_ROOT_NAME = "Root";
-    private final Deque<SwingWorker<Void, Path>> workers = new ConcurrentLinkedDeque<>();
-
-    static JFrame frame;
+    private static JFrame frame;
+    private SwingWorker<Void, Path> worker;
+    //Определеят нужно ли останавливать поиск файлов
+    private boolean isFindFilesContainingTextCancelled = false;
 
     public static void main(String[] args) {
         try {
@@ -78,6 +81,8 @@ public class MainMenu {
         initializeFileTree();
 
         initializeSearchButton();
+
+        initializeCancelButton();
 
         initializeFileContentPanel();
 
@@ -119,10 +124,10 @@ public class MainMenu {
             } else if (findingTextTextField.getText().isEmpty()) {
                 JOptionPane.showMessageDialog(frame, "Text to find must not be empty");
                 return;
-            } else if (fileExtensionTextField.getText().isEmpty()) {
+            }/* else if (fileExtensionTextField.getText().isEmpty()) {
                 JOptionPane.showMessageDialog(frame, "File extension must not be empty");
                 return;
-            }/* else if (!fileExtensionTextField.getText().startsWith(".")) {
+            }*//* else if (!fileExtensionTextField.getText().startsWith(".")) {
                 JOptionPane.showMessageDialog(frame, "File extension must start with .");
                 return;
             }*/
@@ -132,11 +137,6 @@ public class MainMenu {
 
             if (selectedFolder.exists() && selectedFolder.isDirectory()) {
 
-                workers.forEach(workerOld -> {
-                    workerOld.cancel(true);
-                    while (!workerOld.isDone()) ;
-                    workers.remove(workerOld);
-                });
 
                 final String textToFind = findingTextTextField.getText();
                 final String fileExtension = fileExtensionTextField.getText();
@@ -157,16 +157,17 @@ public class MainMenu {
                 ((DefaultMutableTreeNode) model.getRoot()).removeAllChildren();
                 model.reload((DefaultMutableTreeNode) model.getRoot());
 
-                /////////////////////////////////////////////////
                 //background task
-                SwingWorker<Void, Path> worker = new SwingWorker<>() {
+                worker = new SwingWorker<>() {
 
                     @Override
                     protected Void doInBackground() {
+                        searchButton.setEnabled(false);
+                        folderLocationButton.setEnabled(false);
+                        cancelButton.setEnabled(true);
                         fileTreeProgressBar.setIndeterminate(true);
 
-                        if (!isDone())
-                            WorkingWithFilesUtils.findFilesContainingTextAndLazyFillTree(selectedFolder, textToFind, fileExtension, this::publish);
+                        WorkingWithFilesUtils.findFilesContainingTextAndLazyFillTree(selectedFolder, textToFind, fileExtension, this::publish, () -> isFindFilesContainingTextCancelled);
 
                         return null;
                     }
@@ -180,27 +181,24 @@ public class MainMenu {
 
                     @Override
                     protected void done() {
+                        isFindFilesContainingTextCancelled = false;
                         fileTreeProgressBar.setIndeterminate(false);
+                        folderLocationButton.setEnabled(true);
+                        searchButton.setEnabled(true);
+                        cancelButton.setEnabled(false);
                     }
                 };
 
-                workers.add(worker);
                 worker.execute();
-                /////////////////////////////////////////////////
-
-                //Добавляет ноду в дерево при нахождении нового файла.
-                //Благодаря этому, пользователь может просматривать файлы,
-                //не дожидаясь полного построения дерева.
-/*                FileTreeFiller callback = this::addNodeToFileTree;
-                Thread thread = new Thread(() -> {
-                    fileTreeProgressBar.setIndeterminate(true);
-                    WorkingWithFilesUtils.findFilesContainingTextAndLazyFillTree(selectedFolder, textToFind, fileExtension, callback);
-                    fileTreeProgressBar.setIndeterminate(false);
-                });
-                thread.start();*/
-
                 System.out.println("After fill file tree");
             }
+        });
+    }
+
+    private void initializeCancelButton() {
+        cancelButton.setEnabled(false);
+        cancelButton.addActionListener(e -> {
+            isFindFilesContainingTextCancelled = true;
         });
     }
 

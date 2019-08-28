@@ -3,9 +3,12 @@ package com.github.peshkovm.gui;
 import javax.swing.table.AbstractTableModel;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.lang.ref.Cleaner;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -18,7 +21,6 @@ public class BigFileTableModel extends AbstractTableModel {
     private static final Class<?>[] COLUMN_CLASSES = {Integer.class, String.class};
 
     private final List<Integer> linePositions = new ArrayList<>();
-    private RandomAccessFile randomAccessFile;
     private MappedByteBuffer buffer;
     private String filePath;
     private int fileSize;
@@ -41,52 +43,46 @@ public class BigFileTableModel extends AbstractTableModel {
     }
 
     public void close() {
-        if (randomAccessFile != null) {
-            try {
-                randomAccessFile.close();
-                System.gc();
-            } catch (IOException ex) {
-                Logger.getLogger(BigFileTableModel.class.getName()).log(Level.SEVERE, null, ex);
-            }
-            randomAccessFile = null;
-        }
+        buffer = null;
+        System.gc();
     }
 
     public void readFile() throws IOException {
-        randomAccessFile = new RandomAccessFile(filePath, "r");
+        try (FileChannel fileChannel = FileChannel.open(Paths.get(filePath))) {
 
-        long fileLength = randomAccessFile.length();
+            long fileLength = fileChannel.size();
 
-        if (fileLength > Integer.MAX_VALUE) {
-            throw new IOException("File too large, " + fileLength + " > " + Integer.MAX_VALUE);
-        }
-
-        int fileSize = (int) randomAccessFile.length();
-
-        this.fileSize = fileSize;
-
-        buffer = randomAccessFile.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, fileSize);
-
-        long lineLength = 0, maxLineLength = 0;
-        for (int pos = 0; pos < fileSize; ++pos) {
-            byte b = buffer.get();
-            lineLength++;
-            if (b == '\n') {
-                if (lineLength > maxLineLength) {
-                    numOfLongestRow = linePositions.size() - 1;
-                    maxLineLength = lineLength;
-                }
-                lineLength = 0;
-
-                linePositions.add(pos + 1);
+            if (fileLength > Integer.MAX_VALUE) {
+                throw new IOException("File too large, " + fileLength + " > " + Integer.MAX_VALUE);
             }
-        }
 
-        if (fileSize > linePositions.get(linePositions.size() - 1)) {
-            linePositions.add(fileSize); // Last line without newline character.
-        }
+            int fileSize = (int) fileLength;
 
-        System.out.println("readFile отработал");
+            this.fileSize = fileSize;
+
+            buffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileSize);
+
+            long lineLength = 0, maxLineLength = 0;
+            for (int pos = 0; pos < fileSize; ++pos) {
+                byte b = buffer.get();
+                lineLength++;
+                if (b == '\n') {
+                    if (lineLength > maxLineLength) {
+                        numOfLongestRow = linePositions.size() - 1;
+                        maxLineLength = lineLength;
+                    }
+                    lineLength = 0;
+
+                    linePositions.add(pos + 1);
+                }
+            }
+
+            if (fileSize > linePositions.get(linePositions.size() - 1)) {
+                linePositions.add(fileSize); // Last line without newline character.
+            }
+
+            System.out.println("readFile отработал");
+        }
     }
 
     @Override
