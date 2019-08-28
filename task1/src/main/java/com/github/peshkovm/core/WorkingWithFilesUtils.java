@@ -8,6 +8,7 @@ import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 import java.nio.MappedByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -85,26 +86,6 @@ public class WorkingWithFilesUtils {
 
                         if (filePath.toFile().isFile() && extension.equals(fileExtension)) {
 
-                            //System.out.println("\n visited file = " + file.getFileName() + "\n");
-
-                            /*if (fileContent.length > 10 && SystemTray.isSupported()) {
-                                SystemTray systemTray = SystemTray.getSystemTray();
-                                java.net.URL imgURL = getClass().getClassLoader().getResource("gui-icons/warning.png");
-
-                                if (imgURL != null) {
-                                    Image icon = Toolkit.getDefaultToolkit().getImage(imgURL);
-                                    TrayIcon trayIcon = new TrayIcon(icon, "Предупреждение от iFuture task 1");
-                                    trayIcon.setImageAutoSize(true);
-                                    systemTray.add(trayIcon);
-                                    System.out.println("Before tray");
-                                    trayIcon.displayMessage("Файл слишком большой", filePath.toString(), TrayIcon.MessageType.INFO);
-                                    System.out.println("After tray");
-                                }
-
-                                //return FileVisitResult.CONTINUE;
-                            } else
-                                System.out.println("SystemTray is not supported");*/
-
                             try (FileChannel fileChannel = FileChannel.open(filePath)) {
                                 if (fileChannel.size() > Integer.MAX_VALUE) {
                                     System.out.println("\nФайл слишком большой: " + filePath);
@@ -125,13 +106,14 @@ public class WorkingWithFilesUtils {
                         }
 
                     } catch (Exception e) {
-
+                        e.printStackTrace();
+                        return FileVisitResult.TERMINATE;
                     }
 
                     return FileVisitResult.CONTINUE;
                 }
             });
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
             //throw new RuntimeException(e);
         }

@@ -16,6 +16,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
 
 public class MainMenu {
@@ -47,6 +49,7 @@ public class MainMenu {
     private final java.util.List<FileContentTableScrollPane> fileContentTableScrollPaneList = new ArrayList<>();
     private final JFileChooser fileLocationChooser = new JFileChooser();
     private final static String FILE_TREE_ROOT_NAME = "Root";
+    private final Deque<SwingWorker<Void, Path>> workers = new ConcurrentLinkedDeque<>();
 
     static JFrame frame;
 
@@ -57,8 +60,10 @@ public class MainMenu {
             e.printStackTrace();
         }
 
-        frame = new JFrame("iFuture task 1");
-        frame.setContentPane(new MainMenu().formPanel);
+        SwingUtilities.invokeLater(() -> {
+            frame = new JFrame("iFuture task 1");
+            frame.setContentPane(new MainMenu().formPanel);
+        });
     }
 
     public MainMenu() {
@@ -126,6 +131,13 @@ public class MainMenu {
             final File selectedFolder = new File(folderLocationTextField.getText());
 
             if (selectedFolder.exists() && selectedFolder.isDirectory()) {
+
+                workers.forEach(workerOld -> {
+                    workerOld.cancel(true);
+                    while (!workerOld.isDone()) ;
+                    workers.remove(workerOld);
+                });
+
                 final String textToFind = findingTextTextField.getText();
                 final String fileExtension = fileExtensionTextField.getText();
 
@@ -143,6 +155,7 @@ public class MainMenu {
 
                 DefaultTreeModel model = (DefaultTreeModel) fileTree.getModel();
                 ((DefaultMutableTreeNode) model.getRoot()).removeAllChildren();
+                model.reload((DefaultMutableTreeNode) model.getRoot());
 
                 /////////////////////////////////////////////////
                 //background task
@@ -152,7 +165,8 @@ public class MainMenu {
                     protected Void doInBackground() {
                         fileTreeProgressBar.setIndeterminate(true);
 
-                        WorkingWithFilesUtils.findFilesContainingTextAndLazyFillTree(selectedFolder, textToFind, fileExtension, this::publish);
+                        if (!isDone())
+                            WorkingWithFilesUtils.findFilesContainingTextAndLazyFillTree(selectedFolder, textToFind, fileExtension, this::publish);
 
                         return null;
                     }
@@ -160,7 +174,8 @@ public class MainMenu {
                     //edt
                     @Override
                     protected void process(List<Path> nodes) {
-                        nodes.forEach(filePath -> addNodeToFileTree(filePath));
+                        if (!isDone())
+                            nodes.forEach(filePath -> addNodeToFileTree(filePath));
                     }
 
                     @Override
@@ -168,6 +183,8 @@ public class MainMenu {
                         fileTreeProgressBar.setIndeterminate(false);
                     }
                 };
+
+                workers.add(worker);
                 worker.execute();
                 /////////////////////////////////////////////////
 
