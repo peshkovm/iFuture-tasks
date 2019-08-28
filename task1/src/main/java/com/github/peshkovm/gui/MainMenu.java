@@ -16,11 +16,9 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
 
-public class MainMenu {
+class MainMenu {
     private JPanel menuPanel;
     private JPanel fileTreePanel;
     private JPanel fileContentPanel;
@@ -69,7 +67,7 @@ public class MainMenu {
         });
     }
 
-    public MainMenu() {
+    private MainMenu() {
         createUIComponents();
     }
 
@@ -197,9 +195,7 @@ public class MainMenu {
 
     private void initializeCancelButton() {
         cancelButton.setEnabled(false);
-        cancelButton.addActionListener(e -> {
-            isFindFilesContainingTextCancelled = true;
-        });
+        cancelButton.addActionListener(e -> isFindFilesContainingTextCancelled = true);
     }
 
     private void initializeFolderLocationButton() {
@@ -349,7 +345,7 @@ public class MainMenu {
     private class ButtonTabComponent extends JPanel {
         private final TreePath filePath;
 
-        public ButtonTabComponent(TreePath filePath) {
+        ButtonTabComponent(TreePath filePath) {
             this.filePath = filePath;
             String tabText = filePath.getLastPathComponent().toString();
             JLabel label = new JLabel(tabText);
@@ -407,13 +403,13 @@ public class MainMenu {
 
         }
 
-        public TreePath getFilePath() {
+        TreePath getFilePath() {
             return filePath;
         }
     }
 
     private static class FileContentTableScrollPane extends JScrollPane {
-        public FileContentTableScrollPane(FileContentTable fileContentTable) {
+        FileContentTableScrollPane(FileContentTable fileContentTable) {
             super(fileContentTable, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
 
             final int FILE_MAX_SIZE = 1000;

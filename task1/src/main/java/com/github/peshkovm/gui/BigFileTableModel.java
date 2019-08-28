@@ -2,17 +2,12 @@ package com.github.peshkovm.gui;
 
 import javax.swing.table.AbstractTableModel;
 import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.lang.ref.Cleaner;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public class BigFileTableModel extends AbstractTableModel {
 
@@ -36,7 +31,7 @@ public class BigFileTableModel extends AbstractTableModel {
         }
     }
 
-    public void setFilePath(String filePath) throws IOException {
+    private void setFilePath(String filePath) {
         linePositions.clear();
         linePositions.add(0);
         this.filePath = filePath;
@@ -47,7 +42,7 @@ public class BigFileTableModel extends AbstractTableModel {
         System.gc();
     }
 
-    public void readFile() throws IOException {
+    private void readFile() throws IOException {
         try (FileChannel fileChannel = FileChannel.open(Paths.get(filePath))) {
 
             long fileLength = fileChannel.size();
@@ -121,33 +116,27 @@ public class BigFileTableModel extends AbstractTableModel {
         if (!isMousePressed) {
             System.out.println("row = " + (i + 1));
 
-            switch (i1) {
-                case 0: {
-                    return i + 1; //начать отчет номеров строк с 1 вместо 0
-                }
-                default:
-                    if (0 <= i && i < getRowCount()) {
-                        int startPos = linePositions.get(i);
-                        int endPos = linePositions.get(i + 1) - 1;
-                        byte[] line = new byte[endPos - startPos];
-                        buffer.position(startPos);
-                        buffer.get(line);
-                        String s = new String(line, StandardCharsets.UTF_8); // UTF-8!
-                        if (s.endsWith("\r")) {
-                            s = s.substring(0, s.length() - 1);
-                        }
-                        return s;
-                    } else
-                        return "";
+            if (i1 == 0) {
+                return i + 1; //начать отчет номеров строк с 1 вместо 0
             }
+            if (0 <= i && i < getRowCount()) {
+                int startPos = linePositions.get(i);
+                int endPos = linePositions.get(i + 1) - 1;
+                byte[] line = new byte[endPos - startPos];
+                buffer.position(startPos);
+                buffer.get(line);
+                String s = new String(line, StandardCharsets.UTF_8); // UTF-8!
+                if (s.endsWith("\r")) {
+                    s = s.substring(0, s.length() - 1);
+                }
+                return s;
+            } else
+                return "";
         } else {
-            switch (i1) {
-                case 0: {
-                    return i + 1; //начать отчет номеров строк с 1 вместо 0
-                }
-                default:
-                    return "data is loading . . .";
+            if (i1 == 0) {
+                return i + 1; //начать отчет номеров строк с 1 вместо 0
             }
+            return "data is loading . . .";
         }
     }
 

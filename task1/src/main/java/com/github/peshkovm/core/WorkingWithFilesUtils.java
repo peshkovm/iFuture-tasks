@@ -3,14 +3,10 @@ package com.github.peshkovm.core;
 import com.eaio.stringsearch.BoyerMooreHorspool;
 import org.apache.commons.io.FilenameUtils;
 
-import javax.swing.*;
-import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 import java.nio.MappedByteBuffer;
-import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,7 +15,6 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 public class WorkingWithFilesUtils {
@@ -37,7 +32,7 @@ public class WorkingWithFilesUtils {
         try {
             Files.walkFileTree(directoryPath, new SimpleFileVisitor<>() {
                 @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
 
                     try {
                         //System.out.println("\n visited file = " + file.getFileName() + "\n");
@@ -56,7 +51,7 @@ public class WorkingWithFilesUtils {
                             }
                         }
 
-                    } catch (Exception e) {
+                    } catch (Exception ignored) {
 
                     }
 
