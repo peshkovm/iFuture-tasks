@@ -47,7 +47,7 @@
               </grid>
             </constraints>
             <properties>
-              <text value="C:\JavaLessons"/>
+              <text value=""/>
             </properties>
           </component>
           <component id="d47b0" class="javax.swing.JTextField" binding="findingTextTextField">
@@ -57,7 +57,7 @@
               </grid>
             </constraints>
             <properties>
-              <text value="public"/>
+              <text value=""/>
             </properties>
           </component>
           <component id="71c8c" class="javax.swing.JButton" binding="folderLocationButton">
@@ -88,7 +88,7 @@
             </constraints>
             <properties>
               <horizontalAlignment value="2"/>
-              <text value="java"/>
+              <text value="log"/>
             </properties>
           </component>
           <grid id="a5cbe" binding="searchAndCancelButtonsPanel" layout-manager="GridLayoutManager" row-count="1" column-count="2" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">
